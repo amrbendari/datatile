@@ -4,6 +4,8 @@ import android.app.usage.NetworkStats;
 import android.app.usage.NetworkStatsManager;
 import android.content.Context;
 import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import android.text.format.Formatter;
@@ -39,11 +41,33 @@ public class DataTileService extends TileService {
             c.set(Calendar.MILLISECOND, 0);
             long start = c.getTimeInMillis();
             long now = System.currentTimeMillis();
-            long mobile = usage(ConnectivityManager.TYPE_MOBILE, start, now);
-            long wifi = usage(ConnectivityManager.TYPE_WIFI, start, now);
-            t.setLabel("Data " + Formatter.formatShortFileSize(this, mobile));
-            t.setSubtitle("Wi-Fi " + Formatter.formatShortFileSize(this, wifi));
-            t.setState(Tile.STATE_ACTIVE);
+            String mobile = Formatter.formatShortFileSize(this,
+                usage(ConnectivityManager.TYPE_MOBILE, start, now));
+            String wifi = Formatter.formatShortFileSize(this,
+                usage(ConnectivityManager.TYPE_WIFI, start, now));
+
+            ConnectivityManager cm =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            Network n = cm.getActiveNetwork();
+            NetworkCapabilities caps = (n == null) ? null : cm.getNetworkCapabilities(n);
+            boolean onWifi = caps != null
+                && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+            boolean onCell = caps != null
+                && caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+
+            if (onWifi) {
+                t.setLabel("Wi-Fi " + wifi);
+                t.setSubtitle("Mobile " + mobile);
+                t.setState(Tile.STATE_ACTIVE);
+            } else if (onCell) {
+                t.setLabel("Mobile " + mobile);
+                t.setSubtitle("Wi-Fi " + wifi);
+                t.setState(Tile.STATE_ACTIVE);
+            } else {
+                t.setLabel("Offline");
+                t.setSubtitle("Wi-Fi " + wifi + " | " + mobile);
+                t.setState(Tile.STATE_INACTIVE);
+            }
         } catch (Exception e) {
             t.setLabel("Data usage");
             t.setSubtitle("No permission");
